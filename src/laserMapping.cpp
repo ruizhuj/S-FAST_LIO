@@ -19,7 +19,7 @@
 #include <tf/transform_datatypes.h>
 #include <tf/transform_broadcaster.h>
 #include <geometry_msgs/Vector3.h>
-#include <livox_ros_driver/CustomMsg.h>
+#include <livox_ros_driver2/CustomMsg.h>
 #include "preprocess.h"
 #include <ikd-Tree/ikd_Tree.h>
 
@@ -119,7 +119,7 @@ void standard_pcl_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg)
 
 double timediff_lidar_wrt_imu = 0.0;
 bool timediff_set_flg = false;
-void livox_pcl_cbk(const livox_ros_driver::CustomMsg::ConstPtr &msg)
+void livox_pcl_cbk(const livox_ros_driver2::CustomMsg::ConstPtr &msg)
 {
     mtx_buffer.lock();
     double preprocess_start_time = omp_get_wtime();
@@ -420,6 +420,8 @@ void publish_frame_world(const ros::Publisher &pubLaserCloudFull_)
     /**************** save map ****************/
     /* 1. make sure you have enough memories
     /* 2. noted that pcd save will influence the real-time performences **/
+    
+    
     if (pcd_save_en)
     {
         int size = feats_undistort->points.size();
@@ -438,15 +440,17 @@ void publish_frame_world(const ros::Publisher &pubLaserCloudFull_)
         if (scan_wait_num % 4 == 0)
             *pcl_wait_save += *laserCloudWorld;
 
+        ros::Time current_time = ros::Time::now(); 
         if (pcl_wait_save->size() > 0 && pcd_save_interval > 0 && scan_wait_num >= pcd_save_interval)
         {
-            pcd_index++;
-            string all_points_dir(string(string(ROOT_DIR) + "PCD/scans_") + to_string(pcd_index) + string(".pcd"));
+            pcd_index++;            
+            string all_points_dir(string(string(ROOT_DIR) + "PCD/scans_") + to_string(pcd_index) + string("_") + to_string(current_time.sec) + string(".pcd"));
             pcl::PCDWriter pcd_writer;
             cout << "current scan saved to /PCD/" << all_points_dir << endl;
             pcd_writer.writeBinary(all_points_dir, *pcl_wait_save);
             pcl_wait_save->clear();
             scan_wait_num = 0;
+            
         }
     }
 }
@@ -712,17 +716,19 @@ int main(int argc, char **argv)
     /* 2. pcd save will largely influence the real-time performences **/
     if (pcl_wait_save->size() > 0 && pcd_save_en)
     {
+        ros::Time current_time = ros::Time::now();        
+        
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
         for (size_t i = 1; i <= pcd_index; i++)
         {
             pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_temp(new pcl::PointCloud<pcl::PointXYZ>);
-            string all_points_dir(string(string(ROOT_DIR) + "PCD/scans_") + to_string(i) + string(".pcd"));
+            string all_points_dir(string(string(ROOT_DIR) + "PCD/scans_") + to_string(i) + string("_") + to_string(current_time.sec) + string(".pcd"));
             pcl::PCDReader reader;
             reader.read(all_points_dir, *cloud_temp);
             *cloud = *cloud + *cloud_temp;
         }
 
-        string file_name = string("GlobalMap.pcd");
+        string file_name = string("GlobalMap.pcd"); //+ to_string(current_time.sec) + string(".pcd");    
         string all_points_dir(string(string(ROOT_DIR) + "PCD/") + file_name);
         pcl::PCDWriter pcd_writer;
         cout << "current scan saved to /PCD/" << file_name << endl;
@@ -734,7 +740,7 @@ int main(int argc, char **argv)
         featsFromMap->clear();
         featsFromMap->points = ikdtree.PCL_Storage;
         std::cout << "ikdtree size: " << featsFromMap->points.size() << std::endl;
-        string file_name1 = string("GlobalMap_ikdtree.pcd");
+        string file_name1 = string("GlobalMap_ikdtree.pcd"); //+ to_string(current_time.sec) + string(".pcd");    
         pcl::PCDWriter pcd_writer1;
         string all_points_dir1(string(string(ROOT_DIR) + "PCD/") + file_name1);
         cout << "current scan saved to /PCD/" << file_name1 << endl;
